@@ -231,9 +231,19 @@ export function InstancesPage() {
         ? instancesApi.patch(editingId, body)
         : instancesApi.create(body);
     },
-    onSuccess: () => {
+    onSuccess: async (saved) => {
       void qc.invalidateQueries({ queryKey: ["instances"] });
+      void qc.invalidateQueries({ queryKey: ["targets"] });
+      void qc.invalidateQueries({ queryKey: ["summary"] });
       resetForm();
+      const id = saved?.id ?? editingId;
+      if (id) {
+        try {
+          await instancesApi.discover(id);
+          void qc.invalidateQueries({ queryKey: ["targets"] });
+          void qc.invalidateQueries({ queryKey: ["summary"] });
+        } catch {}
+      }
     },
   });
 

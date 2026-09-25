@@ -419,6 +419,16 @@ func (s *Server) upsertInstance(w http.ResponseWriter, r *http.Request, id strin
 		_ = s.cache.InvalidateConfig(r.Context())
 	}
 	_ = s.store.Audit(r.Context(), currentUser(r).ID, "upsert_instance", "instance", saved.ID, map[string]any{"providerKind": saved.ProviderKind})
+
+	go func(instID string) {
+		ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+		defer cancel()
+		targets, _ := s.scanner.DiscoverInstance(ctx, instID)
+		for _, target := range targets {
+			_, _ = s.scanner.ScanTarget(ctx, target.ID)
+		}
+	}(saved.ID)
+
 	writeJSON(w, http.StatusOK, saved)
 }
 

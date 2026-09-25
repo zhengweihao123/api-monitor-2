@@ -302,20 +302,22 @@ func tokenObjectMatchesTarget(obj map[string]any, target domain.MonitorTarget) b
 }
 
 func newAPIBalanceWithStatus(object map[string]any, scale float64, currency string) *domain.Money {
-	if money := inferBalance(object); money != nil {
-		return money
-	}
-	value := floatFromJSON(object, "quota", "remaining_quota", "remain_quota")
-	if value == nil {
-		return nil
-	}
 	if scale <= 0 {
 		scale = 500000.0
 	}
 	if currency == "" {
 		currency = "USD"
 	}
-	return &domain.Money{Amount: *value / scale, Currency: currency}
+	if value := floatFromJSON(object, "quota", "remaining_quota", "remain_quota"); value != nil {
+		return &domain.Money{Amount: *value / scale, Currency: currency}
+	}
+	if money := inferBalance(object); money != nil {
+		if money.Currency == "USD" && currency != "USD" {
+			money.Currency = currency
+		}
+		return money
+	}
+	return nil
 }
 
 func newAPIBalance(object map[string]any) *domain.Money {

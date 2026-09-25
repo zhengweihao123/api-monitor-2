@@ -68,6 +68,15 @@ export function AssetsPage() {
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["targets"] }),
   });
 
+  const syncMut = useMutation({
+    mutationFn: (id: string) => instancesApi.discover(id),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["targets"] });
+      void qc.invalidateQueries({ queryKey: ["summary"] });
+      void qc.invalidateQueries({ queryKey: ["instances"] });
+    },
+  });
+
   const items = query.data?.items ?? [];
   const instanceMap = useMemo(
     () =>
@@ -212,6 +221,10 @@ export function AssetsPage() {
                         ? () => setSelectedId(group.userTarget!.id)
                         : undefined
                     }
+                    onSync={() => syncMut.mutate(group.instanceId)}
+                    syncing={
+                      syncMut.isPending && syncMut.variables === group.instanceId
+                    }
                     t={t}
                   />
                   {!(collapsedGroups[group.instanceId] ?? false) &&
@@ -324,6 +337,8 @@ function AssetGroupRow({
   collapsed,
   onToggle,
   onViewUser,
+  onSync,
+  syncing,
   t,
 }: {
   group: AssetGroup;
@@ -333,6 +348,8 @@ function AssetGroupRow({
   collapsed: boolean;
   onToggle: () => void;
   onViewUser?: () => void;
+  onSync?: () => void;
+  syncing?: boolean;
   t: (k: string) => string;
 }) {
   const instance = group.instance;
@@ -431,6 +448,16 @@ function AssetGroupRow({
             {onViewUser && (
               <button type="button" className="mini-link-button" onClick={onViewUser}>
                 {isEN ? "User details" : "查看用户"}
+              </button>
+            )}
+            {onSync && (
+              <button
+                type="button"
+                className="mini-link-button"
+                onClick={onSync}
+                disabled={syncing}
+              >
+                {syncing ? (isEN ? "Syncing..." : "同步中...") : (isEN ? "Sync" : "同步资产")}
               </button>
             )}
           </div>
