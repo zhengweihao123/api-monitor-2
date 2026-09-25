@@ -181,7 +181,7 @@ export function DashboardPage() {
             />
           </section>
 
-          <section className="mc-mid">
+          <section className="mc-mid mc-mid-full">
             <div className="card">
               <div className="card-hdr">
                 <div className="card-ttl">
@@ -222,35 +222,6 @@ export function DashboardPage() {
                 )}
               </div>
             </div>
-
-            <div className="card">
-              <div className="card-hdr">
-                <div className="card-ttl">
-                  <span className="d" />
-                  上游渠道余额
-                </div>
-              </div>
-              <div className="prov-list">
-                {balanceTargets.length === 0 ? (
-                  <DashboardEmpty
-                    title="暂无上游渠道"
-                    description="添加实例并同步监控资产后，这里会显示真实余额、额度和健康状态。"
-                    compact
-                  />
-                ) : (
-                  balanceTargets
-                    .slice(0, 7)
-                    .map((target) => (
-                      <ProviderCard
-                        key={target.id}
-                        target={target}
-                        instance={instanceMap.get(target.instanceId)}
-                        t={t}
-                      />
-                    ))
-                )}
-              </div>
-            </div>
           </section>
 
           <section className="mc-bot">
@@ -279,6 +250,36 @@ export function DashboardPage() {
                 description="当前后端还没有调用交易流水接口，因此这里不展示模拟记录。"
               />
             </div>
+          </section>
+
+          <section className="card mc-prov-section">
+            <div className="card-hdr">
+              <div className="card-ttl">
+                <span className="d" />
+                上游渠道余额
+              </div>
+              <span className="prov-scroll-badge">
+                共 {balanceTargets.length} 个渠道
+              </span>
+            </div>
+            {balanceTargets.length === 0 ? (
+              <DashboardEmpty
+                title="暂无上游渠道"
+                description="添加实例并同步监控资产后，这里会显示真实余额、额度和健康状态。"
+                compact
+              />
+            ) : (
+              <div className="prov-scroll-container">
+                {balanceTargets.map((target) => (
+                  <ProviderCard
+                    key={target.id}
+                    target={target}
+                    instance={instanceMap.get(target.instanceId)}
+                    t={t}
+                  />
+                ))}
+              </div>
+            )}
           </section>
 
           {(recentAlerts.data?.items ?? []).length > 0 && (

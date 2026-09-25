@@ -1210,11 +1210,73 @@ textarea.input {
   margin-bottom: 18px;
 }
 
+.mc-mid-full {
+  display: block !important;
+  margin-bottom: 18px;
+}
+
+.mc-mid-full .chart-box {
+  height: 380px;
+}
+
 .bot,
 .mc-bot {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 14px;
+  margin-bottom: 18px;
+}
+
+.mc-prov-section {
+  margin-bottom: 18px;
+}
+
+.prov-scroll-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 10px;
+  max-height: 360px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px 8px 6px 2px;
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--ac) 50%, var(--cb)) color-mix(in srgb, var(--cb) 25%, transparent);
+}
+
+.prov-scroll-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.prov-scroll-container::-webkit-scrollbar-track {
+  background: color-mix(in srgb, var(--cb) 30%, transparent);
+  border-radius: 999px;
+  margin: 3px 0;
+}
+
+.prov-scroll-container::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--ac) 45%, var(--cb));
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  transition: background-color 0.2s ease;
+}
+
+.prov-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: var(--ac);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.prov-scroll-badge {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--t4);
+  background: color-mix(in srgb, var(--card-strong) 85%, transparent);
+  padding: 3px 9px;
+  border-radius: 6px;
+  border: 1px solid var(--cb);
 }
 
 .chart-box {
