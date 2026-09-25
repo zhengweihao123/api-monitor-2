@@ -137,10 +137,14 @@ func newAPIUserHeaders(ctx context.Context, client *http.Client, instance domain
 		}
 	}
 
-	// 2. Standalone Token mode (e.g. bypassing captcha or token login)
+	// 2. Standalone Token / Cookie mode (e.g. bypassing captcha or token login)
 	if token != "" {
-		authHeaders := map[string]string{
-			"Authorization": "Bearer " + token,
+		authHeaders := map[string]string{}
+		if strings.Contains(token, "session=") || strings.Contains(token, ";") {
+			authHeaders["Cookie"] = token
+		} else {
+			authHeaders["Authorization"] = "Bearer " + token
+			authHeaders["Cookie"] = "session=" + token
 		}
 		if userID == "" && username != "" {
 			userID = username
