@@ -6,9 +6,63 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"sync"
+	"time"
 
 	"api-monitor/internal/domain"
 )
+
+type cachedSession struct {
+	headers   map[string]string
+	expiresAt time.Time
+}
+
+var (
+	sessionMu    sync.RWMutex
+	sessionCache = make(map[string]cachedSession)
+)
+
+func getCachedSession(key string) (map[string]string, bool) {
+	if key == "" {
+		return nil, false
+	}
+	sessionMu.RLock()
+	defer sessionMu.RUnlock()
+	sess, ok := sessionCache[key]
+	if !ok || time.Now().After(sess.expiresAt) {
+		return nil, false
+	}
+	copyHeaders := make(map[string]string, len(sess.headers))
+	for k, v := range sess.headers {
+		copyHeaders[k] = v
+	}
+	return copyHeaders, true
+}
+
+func setCachedSession(key string, headers map[string]string, ttl time.Duration) {
+	if key == "" || len(headers) == 0 {
+		return
+	}
+	sessionMu.Lock()
+	defer sessionMu.Unlock()
+	copyHeaders := make(map[string]string, len(headers))
+	for k, v := range headers {
+		copyHeaders[k] = v
+	}
+	sessionCache[key] = cachedSession{
+		headers:   copyHeaders,
+		expiresAt: time.Now().Add(ttl),
+	}
+}
+
+func invalidateCachedSession(key string) {
+	if key == "" {
+		return
+	}
+	sessionMu.Lock()
+	defer sessionMu.Unlock()
+	delete(sessionCache, key)
+}
 
 func newAPIUserHeaders(ctx context.Context, client *http.Client, instance domain.Instance) (map[string]string, json.RawMessage, error) {
 	if instance.Credential == nil {
@@ -25,9 +79,13 @@ func newAPIUserHeaders(ctx context.Context, client *http.Client, instance domain
 		stringFromJSON(instance.Credential.JSON, "user_id", "userId", "new_api_user", "newApiUser", "id"),
 	)
 
-	// 1. If username and password are provided, always attempt standard login first.
-	// This automatically negotiates the session cookies, token, and the correct numeric user ID.
+	// 1. If username and password are provided, check session cache first
 	if username != "" && password != "" {
+		cacheKey := baseURL(instance, "") + ":newapi:" + username
+		if cached, ok := getCachedSession(cacheKey); ok {
+			return cached, nil, nil
+		}
+
 		body, _ := json.Marshal(map[string]string{"username": username, "password": password})
 		raw, _, resHeaders, err := requestJSONWithHeaders(ctx, client, http.MethodPost, joinURL(baseURL(instance, ""), "/api/user/login"), map[string]string{}, body)
 		if err == nil {
@@ -53,6 +111,7 @@ func newAPIUserHeaders(ctx context.Context, client *http.Client, instance domain
 				authHeaders["Cookie"] = strings.Join(cookies, "; ")
 			}
 			if authHeaders["Authorization"] != "" || authHeaders["Cookie"] != "" {
+				setCachedSession(cacheKey, authHeaders, 4*time.Hour)
 				return authHeaders, raw, nil
 			}
 		}

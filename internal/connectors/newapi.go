@@ -5,9 +5,55 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
+	"sync"
+	"time"
 
 	"api-monitor/internal/domain"
 )
+
+type siteStatusInfo struct {
+	scale     float64
+	currency  string
+	fetchedAt time.Time
+}
+
+var (
+	siteStatusMu    sync.RWMutex
+	siteStatusCache = make(map[string]siteStatusInfo)
+)
+
+func getSiteStatus(ctx context.Context, client *http.Client, root string) (float64, string) {
+	siteStatusMu.RLock()
+	info, ok := siteStatusCache[root]
+	siteStatusMu.RUnlock()
+	if ok && time.Since(info.fetchedAt) < 1*time.Hour {
+		return info.scale, info.currency
+	}
+
+	scale := 500000.0
+	currency := "USD"
+
+	raw, _, err := requestJSON(ctx, client, http.MethodGet, joinURL(root, "/api/status"), map[string]string{}, nil)
+	if err == nil {
+		data := objectFromAny(unwrapData(raw))
+		if configured := floatFromJSON(data, "quota_per_unit", "quotaPerUnit", "quota_unit_scale"); configured != nil && *configured > 0 {
+			scale = *configured
+		}
+		displayType := stringFromJSON(data, "quota_display_type", "quotaDisplayType")
+		if strings.EqualFold(displayType, "CNY") || strings.EqualFold(displayType, "RMB") {
+			currency = "CNY"
+		} else if displayType != "" {
+			currency = displayType
+		}
+	}
+
+	siteStatusMu.Lock()
+	siteStatusCache[root] = siteStatusInfo{scale: scale, currency: currency, fetchedAt: time.Now()}
+	siteStatusMu.Unlock()
+
+	return scale, currency
+}
 
 type newAPIUserConnector struct {
 	client *http.Client
@@ -45,6 +91,7 @@ func (c *newAPIUserConnector) Discover(ctx context.Context, instance domain.Inst
 		"source":       "newapi_user",
 		"usageSummary": usageSummary,
 	})
+	scale, currency := getSiteStatus(ctx, c.client, baseURL(instance, ""))
 	targets := []domain.MonitorTarget{{
 		InstanceID:   instance.ID,
 		ProviderKind: instance.ProviderKind,
@@ -54,7 +101,7 @@ func (c *newAPIUserConnector) Discover(ctx context.Context, instance domain.Inst
 		GroupName:    firstNonEmpty(stringFromJSON(user, "group"), instance.GroupName),
 		Capabilities: capabilities(domain.CapabilityUsage, domain.CapabilityHealth),
 		Status:       domain.StatusUnknown,
-		Balance:      newAPIBalance(user),
+		Balance:      newAPIBalanceWithStatus(user, scale, currency),
 		Quota:        inferQuota(user),
 		Plan:         parsePlan(user),
 		MonthlyCost:  usageSummaryCost(usageSummary, "30d"),
@@ -139,9 +186,10 @@ func (c *newAPIUserConnector) Scan(ctx context.Context, instance domain.Instance
 	}
 	obj := objectFromAny(unwrapData(raw))
 	usageSummary := newAPIUserUsageSummary(ctx, c.client, baseURL(instance, ""), headers)
+	scale, currency := getSiteStatus(ctx, c.client, baseURL(instance, ""))
 	return &domain.ScanResult{
 		Status:       domain.StatusHealthy,
-		Balance:      newAPIBalance(obj),
+		Balance:      newAPIBalanceWithStatus(obj, scale, currency),
 		Quota:        inferQuota(obj),
 		Plan:         parsePlan(obj),
 		MonthlyCost:  usageSummaryCost(usageSummary, "30d"),
@@ -253,11 +301,25 @@ func tokenObjectMatchesTarget(obj map[string]any, target domain.MonitorTarget) b
 	return name != "" && name == target.Name
 }
 
-func newAPIBalance(object map[string]any) *domain.Money {
+func newAPIBalanceWithStatus(object map[string]any, scale float64, currency string) *domain.Money {
 	if money := inferBalance(object); money != nil {
 		return money
 	}
-	return newAPIQuotaMoney(object, "quota", "remaining_quota", "remain_quota")
+	value := floatFromJSON(object, "quota", "remaining_quota", "remain_quota")
+	if value == nil {
+		return nil
+	}
+	if scale <= 0 {
+		scale = 500000.0
+	}
+	if currency == "" {
+		currency = "USD"
+	}
+	return &domain.Money{Amount: *value / scale, Currency: currency}
+}
+
+func newAPIBalance(object map[string]any) *domain.Money {
+	return newAPIBalanceWithStatus(object, 500000.0, "USD")
 }
 
 func newAPIQuotaMoney(object map[string]any, keys ...string) *domain.Money {
