@@ -8,9 +8,15 @@ import type {
 
 export function formatMoney(m?: Money): string {
   if (!m) return "—";
+  const currency = m.currency?.trim() || "USD";
+  // Upstreams also supply custom units (e.g. CUSTOM or points). Intl's
+  // currency formatter only accepts three-letter currency codes.
+  if (!/^[A-Za-z]{3}$/.test(currency)) {
+    return `${formatNumber(m.amount)} ${currency}`;
+  }
   return new Intl.NumberFormat(undefined, {
     style: "currency",
-    currency: m.currency || "USD",
+    currency,
     maximumFractionDigits: 2,
   }).format(m.amount);
 }
