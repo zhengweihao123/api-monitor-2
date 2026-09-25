@@ -661,17 +661,15 @@ function ProviderCredentialFields({
         <div className="form-grid">
           <Field
             label={
-              provider.kind === "sub2api_user"
-                ? isEN
-                  ? "Email (optional if Token is set)"
-                  : "邮箱（使用 Token 时可留空）"
-                : copy.username
+              isEN
+                ? "Username / Email (optional if Token is set)"
+                : "用户名 / 邮箱（使用 Token 时可留空）"
             }
           >
             <input
               className="input"
               autoComplete="username"
-              placeholder={provider.kind === "sub2api_user" ? (isEN ? "Optional if using Access Token" : "使用 Token 时可留空") : ""}
+              placeholder={isEN ? "Optional if using Access Token" : "使用 Token 时可留空"}
               value={form.credential.username ?? ""}
               onChange={(e) => {
                 onCredentialDirty();
@@ -680,7 +678,7 @@ function ProviderCredentialFields({
                   credential: {
                     ...form.credential,
                     username: e.target.value,
-                    type: "basic",
+                    type: form.credential.value ? "bearer" : "basic",
                   },
                 });
               }}
@@ -688,18 +686,16 @@ function ProviderCredentialFields({
           </Field>
           <Field
             label={
-              provider.kind === "sub2api_user"
-                ? isEN
-                  ? "Password (optional if Token is set)"
-                  : "密码（使用 Token 时可留空）"
-                : copy.password
+              isEN
+                ? "Password (optional if Token is set)"
+                : "密码（使用 Token 时可留空）"
             }
           >
             <input
               className="input"
               type="password"
               autoComplete="current-password"
-              placeholder={provider.kind === "sub2api_user" ? (isEN ? "Optional if using Access Token" : "使用 Token 时可留空") : ""}
+              placeholder={isEN ? "Optional if using Access Token" : "使用 Token 时可留空"}
               value={form.credential.password ?? ""}
               onChange={(e) => {
                 onCredentialDirty();
@@ -708,51 +704,59 @@ function ProviderCredentialFields({
                   credential: {
                     ...form.credential,
                     password: e.target.value,
-                    type: "basic",
+                    type: form.credential.value ? "bearer" : "basic",
+                  },
+                });
+              }}
+            />
+          </Field>
+          <Field
+            label={
+              isEN
+                ? "Access Token (for captcha bypass / token login)"
+                : "访问令牌 Access Token（免密/绕过人机验证）"
+            }
+          >
+            <input
+              className="input"
+              value={form.credential.value || String(form.credential.json?.access_token || form.credential.json?.token || "")}
+              placeholder={
+                isEN
+                  ? "Paste token from browser LocalStorage"
+                  : "开启人机验证时填写：浏览器 LocalStorage 中的 token"
+              }
+              onChange={(e) => {
+                onCredentialDirty();
+                setForm({
+                  ...form,
+                  credential: {
+                    ...form.credential,
+                    value: e.target.value,
+                    type: e.target.value ? "bearer" : "basic",
+                    json: {
+                      ...(form.credential.json ?? {}),
+                      token: e.target.value,
+                      access_token: e.target.value,
+                    },
                   },
                 });
               }}
             />
           </Field>
           {provider.kind === "sub2api_user" && (
-            <>
-              <Field
-                label={
-                  isEN
-                    ? "Access Token (auth_token)"
-                    : "访问令牌 Access Token（免密/绕过验证码）"
-                }
-              >
-                <input
-                  className="input"
-                  value={String(form.credential.json?.access_token ?? "")}
-                  placeholder={
-                    isEN
-                      ? "Paste auth_token from browser LocalStorage"
-                      : "开启人机验证时必填：浏览器 LocalStorage 中的 auth_token"
-                  }
-                  onChange={(e) => {
-                    onCredentialDirty();
-                    setCredentialJSON(form, setForm, {
-                      access_token: e.target.value,
-                    });
-                  }}
-                />
-              </Field>
-              <Field label="Turnstile token">
-                <input
-                  className="input"
-                  value={String(form.credential.json?.turnstile_token ?? "")}
-                  placeholder={copy.optional}
-                  onChange={(e) => {
-                    onCredentialDirty();
-                    setCredentialJSON(form, setForm, {
-                      turnstile_token: e.target.value,
-                    });
-                  }}
-                />
-              </Field>
-            </>
+            <Field label="Turnstile token">
+              <input
+                className="input"
+                value={String(form.credential.json?.turnstile_token ?? "")}
+                placeholder={copy.optional}
+                onChange={(e) => {
+                  onCredentialDirty();
+                  setCredentialJSON(form, setForm, {
+                    turnstile_token: e.target.value,
+                  });
+                }}
+              />
+            </Field>
           )}
         </div>
       </section>
