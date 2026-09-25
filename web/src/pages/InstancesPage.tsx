@@ -661,12 +661,17 @@ function ProviderCredentialFields({
         <div className="form-grid">
           <Field
             label={
-              provider.kind === "sub2api_user" ? copy.email : copy.username
+              provider.kind === "sub2api_user"
+                ? isEN
+                  ? "Email (optional if Token is set)"
+                  : "邮箱（使用 Token 时可留空）"
+                : copy.username
             }
           >
             <input
               className="input"
               autoComplete="username"
+              placeholder={provider.kind === "sub2api_user" ? (isEN ? "Optional if using Access Token" : "使用 Token 时可留空") : ""}
               value={form.credential.username ?? ""}
               onChange={(e) => {
                 onCredentialDirty();
@@ -681,11 +686,20 @@ function ProviderCredentialFields({
               }}
             />
           </Field>
-          <Field label={copy.password}>
+          <Field
+            label={
+              provider.kind === "sub2api_user"
+                ? isEN
+                  ? "Password (optional if Token is set)"
+                  : "密码（使用 Token 时可留空）"
+                : copy.password
+            }
+          >
             <input
               className="input"
               type="password"
               autoComplete="current-password"
+              placeholder={provider.kind === "sub2api_user" ? (isEN ? "Optional if using Access Token" : "使用 Token 时可留空") : ""}
               value={form.credential.password ?? ""}
               onChange={(e) => {
                 onCredentialDirty();
@@ -701,19 +715,44 @@ function ProviderCredentialFields({
             />
           </Field>
           {provider.kind === "sub2api_user" && (
-            <Field label="Turnstile token">
-              <input
-                className="input"
-                value={String(form.credential.json?.turnstile_token ?? "")}
-                placeholder={copy.optional}
-                onChange={(e) => {
-                  onCredentialDirty();
-                  setCredentialJSON(form, setForm, {
-                    turnstile_token: e.target.value,
-                  });
-                }}
-              />
-            </Field>
+            <>
+              <Field
+                label={
+                  isEN
+                    ? "Access Token (auth_token)"
+                    : "访问令牌 Access Token（免密/绕过验证码）"
+                }
+              >
+                <input
+                  className="input"
+                  value={String(form.credential.json?.access_token ?? "")}
+                  placeholder={
+                    isEN
+                      ? "Paste auth_token from browser LocalStorage"
+                      : "开启人机验证时必填：浏览器 LocalStorage 中的 auth_token"
+                  }
+                  onChange={(e) => {
+                    onCredentialDirty();
+                    setCredentialJSON(form, setForm, {
+                      access_token: e.target.value,
+                    });
+                  }}
+                />
+              </Field>
+              <Field label="Turnstile token">
+                <input
+                  className="input"
+                  value={String(form.credential.json?.turnstile_token ?? "")}
+                  placeholder={copy.optional}
+                  onChange={(e) => {
+                    onCredentialDirty();
+                    setCredentialJSON(form, setForm, {
+                      turnstile_token: e.target.value,
+                    });
+                  }}
+                />
+              </Field>
+            </>
           )}
         </div>
       </section>
