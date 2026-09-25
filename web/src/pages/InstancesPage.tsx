@@ -736,7 +736,7 @@ function ProviderCredentialFields({
           >
             <input
               className="input"
-              value={form.credential.value || String(form.credential.json?.access_token || form.credential.json?.token || "")}
+              value={form.credential.value || String(form.credential.json?.access_token || form.credential.json?.auth_token || form.credential.json?.token || "")}
               placeholder={
                 isEN
                   ? "Paste token from browser LocalStorage"
@@ -749,8 +749,8 @@ function ProviderCredentialFields({
                 if (val.startsWith("{") && val.endsWith("}")) {
                   try {
                     const parsed = JSON.parse(val);
-                    if (parsed.token || parsed.access_token) {
-                      val = parsed.token || parsed.access_token;
+                    if (parsed.token || parsed.access_token || parsed.auth_token) {
+                      val = parsed.token || parsed.access_token || parsed.auth_token;
                     }
                     if (parsed.id || parsed.user_id || parsed.userId) {
                       uid = String(parsed.id || parsed.user_id || parsed.userId);
@@ -769,6 +769,7 @@ function ProviderCredentialFields({
                       ...(form.credential.json ?? {}),
                       token: val,
                       access_token: val,
+                      auth_token: val,
                       user_id: uid,
                     },
                   },

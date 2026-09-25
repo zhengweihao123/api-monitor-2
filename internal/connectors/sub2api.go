@@ -31,7 +31,7 @@ func (c *sub2APIUserConnector) Test(ctx context.Context, instance domain.Instanc
 	if err != nil {
 		return &domain.ProbeResult{OK: false, Status: flexibleStatus(err), Message: err.Error(), Capabilities: capabilities(domain.CapabilityUsage, domain.CapabilityHealth, domain.CapabilityManualPlan, domain.CapabilityWindowQuota), Raw: loginRaw}, err
 	}
-	raw, _, err := requestFirstJSON(ctx, c.client, http.MethodGet, baseURL(instance, ""), []string{"/api/v1/auth/me", "/api/v1/users/me", "/api/v1/user/profile"}, headers, nil)
+	raw, _, err := requestFirstJSON(ctx, c.client, http.MethodGet, baseURL(instance, ""), []string{"/api/v1/auth/me", "/api/v1/user", "/api/v1/users/me", "/api/v1/user/profile"}, headers, nil)
 	return &domain.ProbeResult{OK: err == nil, Status: flexibleStatus(err), Message: messageFromErr(err, "sub2Api user API is reachable"), Capabilities: capabilities(domain.CapabilityUsage, domain.CapabilityHealth, domain.CapabilityManualPlan, domain.CapabilityWindowQuota), Raw: raw}, err
 }
 
@@ -41,7 +41,7 @@ func (c *sub2APIUserConnector) Discover(ctx context.Context, instance domain.Ins
 		return nil, err
 	}
 	root := baseURL(instance, "")
-	raw, _, err := requestFirstJSON(ctx, c.client, http.MethodGet, root, []string{"/api/v1/auth/me", "/api/v1/users/me", "/api/v1/user/profile"}, headers, nil)
+	raw, _, err := requestFirstJSON(ctx, c.client, http.MethodGet, root, []string{"/api/v1/auth/me", "/api/v1/user", "/api/v1/users/me", "/api/v1/user/profile"}, headers, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -179,7 +179,7 @@ func (c *sub2APIUserConnector) Scan(ctx context.Context, instance domain.Instanc
 			Raw:          makeRaw(obj),
 		}, nil
 	}
-	raw, _, err := requestFirstJSON(ctx, c.client, http.MethodGet, root, []string{"/api/v1/auth/me", "/api/v1/users/me", "/api/v1/user/profile"}, headers, nil)
+	raw, _, err := requestFirstJSON(ctx, c.client, http.MethodGet, root, []string{"/api/v1/auth/me", "/api/v1/user", "/api/v1/users/me", "/api/v1/user/profile"}, headers, nil)
 	if err != nil {
 		return &domain.ScanResult{Status: flexibleStatus(err), Error: err.Error(), Raw: raw}, err
 	}

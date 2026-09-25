@@ -74,7 +74,7 @@ func newAPIUserHeaders(ctx context.Context, client *http.Client, instance domain
 	password := firstNonEmpty(instance.Credential.Password, stringFromJSON(instance.Credential.JSON, "password"))
 	token := firstNonEmpty(
 		instance.Credential.Value,
-		stringFromJSON(instance.Credential.JSON, "access_token", "accessToken", "token"),
+		stringFromJSON(instance.Credential.JSON, "access_token", "accessToken", "auth_token", "authToken", "token"),
 	)
 	userID := firstNonEmpty(
 		stringFromJSON(instance.Credential.JSON, "user_id", "userId", "new_api_user", "newApiUser", "id"),
@@ -140,11 +140,13 @@ func newAPIUserHeaders(ctx context.Context, client *http.Client, instance domain
 	// 2. Standalone Token / Cookie mode (e.g. bypassing captcha or token login)
 	if token != "" {
 		authHeaders := map[string]string{}
-		if strings.Contains(token, "session=") || strings.Contains(token, ";") {
+		if strings.HasPrefix(strings.ToLower(token), "bearer ") {
+			authHeaders["Authorization"] = token
+		} else if strings.Contains(token, "session=") || strings.Contains(token, "auth_token=") || strings.Contains(token, ";") {
 			authHeaders["Cookie"] = token
 		} else {
 			authHeaders["Authorization"] = "Bearer " + token
-			authHeaders["Cookie"] = "session=" + token
+			authHeaders["Cookie"] = "auth_token=" + token
 		}
 		if userID == "" && username != "" {
 			userID = username
@@ -166,8 +168,15 @@ func sub2APIUserHeaders(ctx context.Context, client *http.Client, instance domai
 	if instance.Credential == nil {
 		return nil, nil, errMissingCredential()
 	}
-	if token := firstNonEmpty(stringFromJSON(instance.Credential.JSON, "access_token", "accessToken"), instance.Credential.Value); token != "" {
-		return map[string]string{"Authorization": "Bearer " + token}, nil, nil
+	if token := firstNonEmpty(stringFromJSON(instance.Credential.JSON, "access_token", "accessToken", "auth_token", "authToken"), instance.Credential.Value); token != "" {
+		headers := map[string]string{}
+		if strings.HasPrefix(strings.ToLower(token), "bearer ") {
+			headers["Authorization"] = token
+		} else {
+			headers["Authorization"] = "Bearer " + token
+			headers["Cookie"] = "auth_token=" + token
+		}
+		return headers, nil, nil
 	}
 	email := firstNonEmpty(instance.Credential.Username, stringFromJSON(instance.Credential.JSON, "email", "username"))
 	password := firstNonEmpty(instance.Credential.Password, stringFromJSON(instance.Credential.JSON, "password"))
