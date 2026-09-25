@@ -169,7 +169,14 @@ func sub2APIUserHeaders(ctx context.Context, client *http.Client, instance domai
 		return nil, nil, errMissingCredential()
 	}
 	if token := firstNonEmpty(stringFromJSON(instance.Credential.JSON, "access_token", "accessToken", "auth_token", "authToken"), instance.Credential.Value); token != "" {
-		headers := map[string]string{}
+		root := baseURL(instance, "")
+		headers := map[string]string{
+			"Accept":          "application/json, text/plain, */*",
+			"Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+			"Origin":          root,
+			"Referer":         strings.TrimRight(root, "/") + "/",
+			"X-Requested-With": "XMLHttpRequest",
+		}
 		if strings.HasPrefix(strings.ToLower(token), "bearer ") {
 			headers["Authorization"] = token
 		} else {
