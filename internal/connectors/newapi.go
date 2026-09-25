@@ -308,8 +308,28 @@ func newAPIBalanceWithStatus(object map[string]any, scale float64, currency stri
 	if currency == "" {
 		currency = "USD"
 	}
-	if value := floatFromJSON(object, "quota", "remaining_quota", "remain_quota"); value != nil {
-		return &domain.Money{Amount: *value / scale, Currency: currency}
+	// 1. If total_quota is explicitly provided, use it directly
+	if total := floatFromJSON(object, "total_quota", "totalQuota"); total != nil && *total > 0 {
+		return &domain.Money{Amount: *total / scale, Currency: currency}
+	}
+	// 2. Sum recharge quota + gift_quota + aff_quota
+	var recharge, gift, aff float64
+	hasQuotaField := false
+	if r := floatFromJSON(object, "quota", "recharge_quota", "rechargeQuota", "remaining_quota", "remain_quota"); r != nil {
+		recharge = *r
+		hasQuotaField = true
+	}
+	if g := floatFromJSON(object, "gift_quota", "giftQuota"); g != nil {
+		gift = *g
+		hasQuotaField = true
+	}
+	if a := floatFromJSON(object, "aff_quota", "affQuota"); a != nil {
+		aff = *a
+		hasQuotaField = true
+	}
+	if hasQuotaField {
+		sum := recharge + gift + aff
+		return &domain.Money{Amount: sum / scale, Currency: currency}
 	}
 	if money := inferBalance(object); money != nil {
 		if money.Currency == "USD" && currency != "USD" {

@@ -350,7 +350,28 @@ func inferBalance(object map[string]any) *domain.Money {
 
 func inferQuota(object map[string]any) *domain.Quota {
 	used := floatFromJSON(object, "used_quota", "usedQuota", "quota_used", "quotaUsed", "used", "usage", "used_amount", "usedAmount")
-	total := floatFromJSON(object, "quota", "total_quota", "totalQuota", "total", "limit", "quota_limit", "quotaLimit")
+	var total *float64
+	if t := floatFromJSON(object, "total_quota", "totalQuota"); t != nil && *t > 0 {
+		total = t
+	} else {
+		var q float64
+		hasQ := false
+		if val := floatFromJSON(object, "quota", "recharge_quota", "rechargeQuota", "total", "limit", "quota_limit", "quotaLimit"); val != nil {
+			q += *val
+			hasQ = true
+		}
+		if g := floatFromJSON(object, "gift_quota", "giftQuota"); g != nil {
+			q += *g
+			hasQ = true
+		}
+		if a := floatFromJSON(object, "aff_quota", "affQuota"); a != nil {
+			q += *a
+			hasQ = true
+		}
+		if hasQ {
+			total = &q
+		}
+	}
 	remaining := floatFromJSON(object, "remaining_quota", "remainingQuota", "remaining", "remain_quota", "remainQuota", "available_quota", "availableQuota")
 	if used == nil && total == nil && remaining == nil {
 		return nil
@@ -362,6 +383,8 @@ func inferQuota(object map[string]any) *domain.Quota {
 	if remaining == nil && total != nil && used != nil {
 		value := *total - *used
 		remaining = &value
+	} else if remaining == nil && total != nil {
+		remaining = total
 	}
 	return &domain.Quota{Used: used, Total: total, Remaining: remaining, Unit: unit}
 }
