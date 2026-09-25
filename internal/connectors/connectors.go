@@ -82,6 +82,12 @@ func requestJSONWithHeaders(ctx context.Context, client *http.Client, method, en
 	if headers["User-Agent"] == "" {
 		req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36")
 	}
+	if headers["Accept"] == "" {
+		req.Header.Set("Accept", "application/json, text/plain, */*")
+	}
+	if headers["Accept-Language"] == "" {
+		req.Header.Set("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
+	}
 	for key, value := range headers {
 		if value != "" {
 			req.Header.Set(key, value)
