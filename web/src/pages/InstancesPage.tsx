@@ -249,10 +249,10 @@ export function InstancesPage() {
     },
     onSuccess: (data) => {
       setDraftTestFeedback({
-        type: data.ok ? "ok" : "err",
-        text: data.ok
+        type: data?.ok ? "ok" : "err",
+        text: data?.ok
           ? `${copy.testOk}: ${data.message || copy.reachable}`
-          : `${copy.testFailed}: ${data.message || copy.unreachable}`,
+          : `${copy.testFailed}: ${data?.message || copy.unreachable}`,
       });
     },
     onError: (err) =>
@@ -268,10 +268,10 @@ export function InstancesPage() {
       setInstanceFeedback((current) => ({
         ...current,
         [id]: {
-          type: data.ok ? "ok" : "err",
-          text: data.ok
+          type: data?.ok ? "ok" : "err",
+          text: data?.ok
             ? `${copy.testOk}: ${data.message || copy.reachable}`
-            : `${copy.testFailed}: ${data.message || copy.unreachable}`,
+            : `${copy.testFailed}: ${data?.message || copy.unreachable}`,
         },
       })),
     onError: (err, id) =>
@@ -758,6 +758,16 @@ function ProviderCredentialFields({
       </section>
     );
   }
+  if (provider.kind === "generic_http") {
+    return (
+      <GenericHTTPFields
+        form={form}
+        setForm={setForm}
+        onCredentialDirty={onCredentialDirty}
+        isEN={isEN}
+      />
+    );
+  }
   if (provider.credentialType === "none") {
     return (
       <section className="credential-panel">
@@ -800,6 +810,131 @@ function ProviderCredentialFields({
           }}
         />
       </Field>
+    </section>
+  );
+}
+
+function GenericHTTPFields({
+  form,
+  setForm,
+  onCredentialDirty,
+  isEN,
+}: {
+  form: InstanceForm;
+  setForm: (form: InstanceForm) => void;
+  onCredentialDirty: () => void;
+  isEN: boolean;
+}) {
+  const settings = (form.settings as Record<string, any>) || {};
+  const [headersText, setHeadersText] = useState(() => {
+    return settings.headers ? JSON.stringify(settings.headers, null, 2) : "";
+  });
+
+  const updateSetting = (key: string, value: unknown) => {
+    onCredentialDirty();
+    setForm({
+      ...form,
+      settings: {
+        ...form.settings,
+        [key]: value,
+      },
+    });
+  };
+
+  const handleHeadersChange = (text: string) => {
+    setHeadersText(text);
+    onCredentialDirty();
+    try {
+      const parsed = JSON.parse(text);
+      if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+        updateSetting("headers", parsed);
+      }
+    } catch {
+      // ignore invalid json while user is typing
+    }
+  };
+
+  return (
+    <section className="credential-panel">
+      <div className="panel-title">
+        <KeyRound size={15} />
+        {isEN ? "Generic HTTP Endpoint Configuration" : "通用 HTTP 余额接口配置"}
+      </div>
+      <div className="hint-row">
+        <Info size={14} />
+        {isEN
+          ? "Configure custom JSON balance endpoint, request method, headers, and payload."
+          : "配置自定义 JSON 余额接口。API Monitor 会定时请求该接口并读取余额与额度。"}
+      </div>
+      <div className="form-grid">
+        <Field label={isEN ? "Request Method" : "请求方法 (Method)"}>
+          <select
+            className="input"
+            value={String(settings.method || "POST")}
+            onChange={(e) => updateSetting("method", e.target.value)}
+          >
+            <option value="POST">POST</option>
+            <option value="GET">GET</option>
+          </select>
+        </Field>
+        <Field label={isEN ? "Endpoint URL (overrides Base URL)" : "请求接口 URL (留空则使用 Base URL)"}>
+          <input
+            className="input"
+            value={String(settings.url || "")}
+            placeholder="https://lzhiyu.ccwu.cc/api/keys.php?action=wallet"
+            onChange={(e) => updateSetting("url", e.target.value)}
+          />
+        </Field>
+        <Field label={isEN ? "Balance JSON Path" : "余额提取路径 (balancePath)"}>
+          <input
+            className="input"
+            value={String(settings.balancePath || "")}
+            placeholder="data.balance.total"
+            onChange={(e) => updateSetting("balancePath", e.target.value)}
+          />
+        </Field>
+        <Field label={isEN ? "Bearer Token (optional)" : "Bearer Token (可选)"}>
+          <input
+            className="input"
+            type="password"
+            placeholder={isEN ? "Optional Authorization: Bearer ..." : "可选 Authorization: Bearer ..."}
+            value={form.credential.value ?? ""}
+            onChange={(e) => {
+              onCredentialDirty();
+              setForm({
+                ...form,
+                credential: {
+                  ...form.credential,
+                  type: "json",
+                  value: e.target.value,
+                },
+              });
+            }}
+          />
+        </Field>
+        <div style={{ gridColumn: "1 / -1" }}>
+          <Field label={isEN ? "Request Headers (JSON object)" : "请求头 Headers (JSON 格式)"}>
+            <textarea
+              className="textarea mono"
+              rows={4}
+              value={headersText}
+              placeholder={`{\n  "Content-Type": "application/json",\n  "X-User-Token": "ut-..."\n}`}
+              onChange={(e) => handleHeadersChange(e.target.value)}
+            />
+          </Field>
+        </div>
+        <div style={{ gridColumn: "1 / -1" }}>
+          <Field label={isEN ? "Request Body (JSON string)" : "请求体 Body (JSON 字符串)"}>
+            <textarea
+              className="textarea mono"
+              rows={3}
+              value={String(settings.body || "")}
+              placeholder={`{"user_token": "ut-...", "days": 7}`}
+              onChange={(e) => updateSetting("body", e.target.value)}
+            />
+          </Field>
+        </div>
+      </div>
     </section>
   );
 }
@@ -1049,7 +1184,7 @@ function createDefaultForm(kind: ProviderKind): InstanceForm {
     groupName: "",
     enabled: true,
     scanIntervalSeconds: 300,
-    settings: {},
+    settings: kind === "generic_http" ? { method: "POST", balancePath: "data.balance.total" } : {},
     credential: {
       type: provider.credentialType,
       value: "",
