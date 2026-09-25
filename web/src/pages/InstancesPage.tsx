@@ -669,7 +669,7 @@ function ProviderCredentialFields({
             <input
               className="input"
               autoComplete="username"
-              placeholder={isEN ? "Optional if using Access Token" : "使用 Token 时可留空"}
+              placeholder={isEN ? "Username or email" : "用户名或邮箱"}
               value={form.credential.username ?? ""}
               onChange={(e) => {
                 onCredentialDirty();
@@ -678,7 +678,7 @@ function ProviderCredentialFields({
                   credential: {
                     ...form.credential,
                     username: e.target.value,
-                    type: form.credential.value ? "bearer" : "basic",
+                    type: e.target.value && form.credential.password ? "basic" : form.credential.type,
                   },
                 });
               }}
@@ -695,7 +695,7 @@ function ProviderCredentialFields({
               className="input"
               type="password"
               autoComplete="current-password"
-              placeholder={isEN ? "Optional if using Access Token" : "使用 Token 时可留空"}
+              placeholder={isEN ? "Account password" : "账号密码"}
               value={form.credential.password ?? ""}
               onChange={(e) => {
                 onCredentialDirty();
@@ -704,12 +704,19 @@ function ProviderCredentialFields({
                   credential: {
                     ...form.credential,
                     password: e.target.value,
-                    type: form.credential.value ? "bearer" : "basic",
+                    type: form.credential.username && e.target.value ? "basic" : form.credential.type,
                   },
                 });
               }}
             />
           </Field>
+          {provider.kind === "newapi_user" && (
+            <div style={{ fontSize: "11px", color: "var(--t4)", background: "color-mix(in srgb, var(--card) 60%, transparent)", border: "1px solid var(--cb)", borderRadius: "8px", padding: "8px 10px", marginTop: "2px", marginBottom: "8px" }}>
+              💡 {isEN
+                ? "Tip: Normal sites only need Username and Password above; keep Access Token empty. If the site has Cloudflare / Turnstile captcha, fill in the Access Token and User ID below."
+                : "💡 提示：普通站点直接填写上方用户名和密码即可，访问令牌保持留空！只有当站点开启了人机验证（验证码）导致密码无法登录时，才需使用下方访问令牌与用户 ID。"}
+            </div>
+          )}
           <Field
             label={
               isEN
@@ -723,26 +730,67 @@ function ProviderCredentialFields({
               placeholder={
                 isEN
                   ? "Paste token from browser LocalStorage"
-                  : "开启人机验证时填写：浏览器 LocalStorage 中的 token"
+                  : "开启人机验证时填写：浏览器 LocalStorage 中的 token 或完整 JSON"
               }
               onChange={(e) => {
                 onCredentialDirty();
+                let val = e.target.value.trim();
+                let uid = String(form.credential.json?.user_id ?? "");
+                if (val.startsWith("{") && val.endsWith("}")) {
+                  try {
+                    const parsed = JSON.parse(val);
+                    if (parsed.token || parsed.access_token) {
+                      val = parsed.token || parsed.access_token;
+                    }
+                    if (parsed.id || parsed.user_id || parsed.userId) {
+                      uid = String(parsed.id || parsed.user_id || parsed.userId);
+                    } else if (parsed.user?.id) {
+                      uid = String(parsed.user.id);
+                    }
+                  } catch {}
+                }
                 setForm({
                   ...form,
                   credential: {
                     ...form.credential,
-                    value: e.target.value,
-                    type: e.target.value ? "bearer" : "basic",
+                    value: val,
+                    type: form.credential.username && form.credential.password ? "basic" : (val ? "bearer" : "basic"),
                     json: {
                       ...(form.credential.json ?? {}),
-                      token: e.target.value,
-                      access_token: e.target.value,
+                      token: val,
+                      access_token: val,
+                      user_id: uid,
                     },
                   },
                 });
               }}
             />
           </Field>
+          {provider.kind === "newapi_user" && (
+            <Field
+              label={
+                isEN
+                  ? "User ID (New-Api-User, required if using Token)"
+                  : "用户 ID（New-Api-User，仅使用 Token 登录时填写）"
+              }
+            >
+              <input
+                className="input"
+                value={String(form.credential.json?.user_id ?? "")}
+                placeholder={
+                  isEN
+                    ? "Numeric ID (e.g. 1 or 42)"
+                    : "纯数字用户 ID，如 1、42（可在站点个人中心或 LocalStorage 查看）"
+                }
+                onChange={(e) => {
+                  onCredentialDirty();
+                  setCredentialJSON(form, setForm, {
+                    user_id: e.target.value.trim(),
+                  });
+                }}
+              />
+            </Field>
+          )}
           {provider.kind === "sub2api_user" && (
             <Field label="Turnstile token">
               <input
