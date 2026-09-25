@@ -835,6 +835,8 @@ function GenericHTTPFields({
     setForm({
       ...form,
       settings: {
+        method: "POST",
+        balancePath: "data.balance.total",
         ...form.settings,
         [key]: value,
       },
@@ -888,7 +890,7 @@ function GenericHTTPFields({
         <Field label={isEN ? "Balance JSON Path" : "余额提取路径 (balancePath)"}>
           <input
             className="input"
-            value={String(settings.balancePath || "")}
+            value={String(settings.balancePath || "data.balance.total")}
             placeholder="data.balance.total"
             onChange={(e) => updateSetting("balancePath", e.target.value)}
           />
@@ -1197,6 +1199,14 @@ function createDefaultForm(kind: ProviderKind): InstanceForm {
 
 function formFromInstance(instance: Instance): InstanceForm {
   const next = createDefaultForm(instance.providerKind);
+  const settings = {
+    ...next.settings,
+    ...(instance.settings ?? {}),
+  };
+  if (instance.providerKind === "generic_http") {
+    if (!settings.method) settings.method = "POST";
+    if (!settings.balancePath) settings.balancePath = "data.balance.total";
+  }
   return {
     ...next,
     name: instance.name,
@@ -1204,7 +1214,7 @@ function formFromInstance(instance: Instance): InstanceForm {
     groupName: instance.groupName ?? "",
     enabled: instance.enabled,
     scanIntervalSeconds: instance.scanIntervalSeconds,
-    settings: instance.settings ?? {},
+    settings,
   };
 }
 
@@ -1213,6 +1223,11 @@ function instancePayload(
   isEditing: boolean,
   credentialDirty: boolean,
 ): UpsertInstanceRequest {
+  const settings = { ...form.settings };
+  if (form.providerKind === "generic_http") {
+    if (!settings.method) settings.method = "POST";
+    if (!settings.balancePath) settings.balancePath = "data.balance.total";
+  }
   const body: UpsertInstanceRequest = {
     name: form.name,
     providerKind: form.providerKind,
@@ -1220,7 +1235,7 @@ function instancePayload(
     groupName: form.groupName,
     enabled: form.enabled,
     scanIntervalSeconds: form.scanIntervalSeconds,
-    settings: form.settings,
+    settings,
   };
   if (!isEditing || credentialDirty) {
     body.credential = form.credential;
