@@ -146,7 +146,7 @@ func newAPIUserHeaders(ctx context.Context, client *http.Client, instance domain
 			authHeaders["Cookie"] = token
 		} else {
 			authHeaders["Authorization"] = "Bearer " + token
-			authHeaders["Cookie"] = "auth_token=" + token
+			authHeaders["Cookie"] = "session=" + token
 		}
 		if userID == "" && username != "" {
 			userID = username
@@ -161,29 +161,14 @@ func newAPIUserHeaders(ctx context.Context, client *http.Client, instance domain
 }
 
 func sub2APIUserHeaders(ctx context.Context, client *http.Client, instance domain.Instance) (map[string]string, json.RawMessage, error) {
-	headers := bearerHeaders(instance)
-	if headers["Authorization"] != "" {
-		return headers, nil, nil
-	}
 	if instance.Credential == nil {
 		return nil, nil, errMissingCredential()
 	}
-	if token := firstNonEmpty(stringFromJSON(instance.Credential.JSON, "access_token", "accessToken", "auth_token", "authToken"), instance.Credential.Value); token != "" {
-		root := baseURL(instance, "")
-		headers := map[string]string{
-			"Accept":          "application/json, text/plain, */*",
-			"Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
-			"Origin":          root,
-			"Referer":         strings.TrimRight(root, "/") + "/",
-			"X-Requested-With": "XMLHttpRequest",
-		}
+	if token := strings.TrimSpace(firstNonEmpty(instance.Credential.Value, stringFromJSON(instance.Credential.JSON, "access_token", "accessToken", "auth_token", "authToken", "token"))); token != "" {
 		if strings.HasPrefix(strings.ToLower(token), "bearer ") {
-			headers["Authorization"] = token
-		} else {
-			headers["Authorization"] = "Bearer " + token
-			headers["Cookie"] = "auth_token=" + token
+			token = strings.TrimSpace(token[7:])
 		}
-		return headers, nil, nil
+		return map[string]string{"Authorization": "Bearer " + token, "Accept": "application/json"}, nil, nil
 	}
 	email := firstNonEmpty(instance.Credential.Username, stringFromJSON(instance.Credential.JSON, "email", "username"))
 	password := firstNonEmpty(instance.Credential.Password, stringFromJSON(instance.Credential.JSON, "password"))
@@ -226,9 +211,14 @@ func requestFirstJSON(ctx context.Context, client *http.Client, method, root str
 	var lastRaw json.RawMessage
 	var lastErr error
 	for _, path := range paths {
-		raw, _, err := requestJSON(ctx, client, method, joinURL(root, path), headers, body)
+		raw, status, err := requestJSON(ctx, client, method, joinURL(root, path), headers, body)
 		if err == nil {
 			return raw, path, nil
+		}
+		// Only missing routes justify trying a different endpoint. Preserve
+		// authentication, rate-limit and network errors from the real route.
+		if status != http.StatusNotFound && status != http.StatusMethodNotAllowed {
+			return raw, path, err
 		}
 		lastRaw = raw
 		lastErr = err

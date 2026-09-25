@@ -879,9 +879,14 @@ func decodeJSON(w http.ResponseWriter, r *http.Request, out any) bool {
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {
+	data, err := json.Marshal(value)
+	if err != nil {
+		status = http.StatusInternalServerError
+		data = []byte(`{"error":{"code":"response_encoding_failed","message":"Unable to encode API response"}}`)
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(value)
+	_, _ = w.Write(data)
 }
 
 func writeError(w http.ResponseWriter, status int, code, message string, details any) {

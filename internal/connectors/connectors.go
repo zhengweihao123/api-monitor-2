@@ -97,10 +97,16 @@ func requestJSONWithHeaders(ctx context.Context, client *http.Client, method, en
 		return nil, res.StatusCode, res.Header, err
 	}
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		if !json.Valid(data) {
+			return nil, res.StatusCode, res.Header, fmt.Errorf("upstream status %d at %s: non-JSON response (possible gateway or access challenge)", res.StatusCode, req.URL.Path)
+		}
 		return json.RawMessage(data), res.StatusCode, res.Header, fmt.Errorf("upstream status %d: %s", res.StatusCode, string(data))
 	}
 	if len(data) == 0 {
 		data = []byte(`{}`)
+	}
+	if !json.Valid(data) {
+		return nil, res.StatusCode, res.Header, fmt.Errorf("upstream status %d at %s: expected JSON, received a non-JSON page", res.StatusCode, req.URL.Path)
 	}
 	return json.RawMessage(data), res.StatusCode, res.Header, nil
 }
