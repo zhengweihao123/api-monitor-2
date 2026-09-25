@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"sync"
@@ -89,30 +90,45 @@ func newAPIUserHeaders(ctx context.Context, client *http.Client, instance domain
 		body, _ := json.Marshal(map[string]string{"username": username, "password": password})
 		raw, _, resHeaders, err := requestJSONWithHeaders(ctx, client, http.MethodPost, joinURL(baseURL(instance, ""), "/api/user/login"), map[string]string{}, body)
 		if err == nil {
-			data := objectFromAny(unwrapData(raw))
-			user := objectFromAny(data["user"])
-			loginToken := firstNonEmpty(
-				stringFromJSON(data, "token", "access_token", "accessToken"),
-				stringFromJSON(user, "token", "access_token", "accessToken"),
-			)
-			loginUserID := firstNonEmpty(
-				stringFromJSON(user, "id", "user_id", "userId"),
-				stringFromJSON(data, "user_id", "userId", "id"),
-			)
-			cookies := collectCookies(resHeaders)
-			authHeaders := map[string]string{}
-			if loginToken != "" {
-				authHeaders["Authorization"] = "Bearer " + loginToken
-			}
-			if loginUserID != "" {
-				authHeaders["New-Api-User"] = loginUserID
-			}
-			if len(cookies) > 0 {
-				authHeaders["Cookie"] = strings.Join(cookies, "; ")
-			}
-			if authHeaders["Authorization"] != "" || authHeaders["Cookie"] != "" {
-				setCachedSession(cacheKey, authHeaders, 4*time.Hour)
-				return authHeaders, raw, nil
+			var respObj map[string]any
+			_ = json.Unmarshal(raw, &respObj)
+			if success, ok := respObj["success"].(bool); ok && !success {
+				errMsg := stringFromJSON(respObj, "message")
+				if errMsg == "" {
+					errMsg = "login failed"
+				}
+				if strings.Contains(strings.ToLower(errMsg), "turnstile") || strings.Contains(errMsg, "人机") || strings.Contains(errMsg, "验证") {
+					err = fmt.Errorf("该站点已开启人机验证 (%s)，无法直接使用账号密码登录，请改用下方的【访问令牌 Access Token】与【用户 ID】", errMsg)
+				} else {
+					err = errors.New(errMsg)
+				}
+			} else {
+				data := objectFromAny(unwrapData(raw))
+				user := objectFromAny(data["user"])
+				loginToken := firstNonEmpty(
+					stringFromJSON(data, "token", "access_token", "accessToken"),
+					stringFromJSON(user, "token", "access_token", "accessToken"),
+				)
+				loginUserID := firstNonEmpty(
+					stringFromJSON(user, "id", "user_id", "userId"),
+					stringFromJSON(data, "user_id", "userId", "id"),
+				)
+				cookies := collectCookies(resHeaders)
+				authHeaders := map[string]string{}
+				if loginToken != "" {
+					authHeaders["Authorization"] = "Bearer " + loginToken
+				}
+				if loginUserID != "" {
+					authHeaders["New-Api-User"] = loginUserID
+				}
+				if len(cookies) > 0 {
+					authHeaders["Cookie"] = strings.Join(cookies, "; ")
+				}
+				if authHeaders["Authorization"] != "" || authHeaders["Cookie"] != "" {
+					setCachedSession(cacheKey, authHeaders, 4*time.Hour)
+					return authHeaders, raw, nil
+				}
+				err = errors.New("login succeeded but no session token or cookie returned")
 			}
 		}
 		// If password login failed and we have no fallback token, return the login error
